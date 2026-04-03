@@ -29,7 +29,7 @@ const COMPANIONS = [
     id: "eva", name: "Eva",
     bgColor: "#64748B",
     accent: "#64748B", accentRgb: "100,116,139",
-    voiceId: "WeA4Q36twV5kwSaTEL0Q",
+    voiceId: "4RZ84U1b4WCqpu57LvIq",
     label: "TECH_CORE", status: "ANALYTICAL MODE", theme: "eva",
     wakeWords: ["hey eva", "eva", "wake up", "aegis online"],
     greeting: (name: string) =>
