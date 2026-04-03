@@ -839,7 +839,7 @@ export default function Home() {
           </div>
           <div style={{display:"flex",gap:"10px",flexShrink:0}}>
             {isMounted&&<span className="stxt" style={{opacity:.6}}>LVL {level} · {xp}XP · {streak}🔥</span>}
-            {isMounted&&<span className="stxt" style={{opacity:.3,display:"none"}} className="stxt hide-mobile">{currentTime}</span>}
+            {isMounted&&<span className="stxt hide-mobile" style={{opacity:.3,display:"none"}}>{currentTime}</span>}
           </div>
         </div>
 
@@ -917,7 +917,7 @@ export default function Home() {
 
           {/* COMPANION */}
           <div className="companion-wrap">
-            <div className="companion-3d" style={{position:"relative"}} className={`companion-3d ${companionAnim?`ca-${companionAnim}`:""}`}>
+            <div className={`companion-3d ${companionAnim?`ca-${companionAnim}`:""}`} style={{position:"relative"}}>
               <div className="aura" style={{position:"absolute",inset:"-15%",borderRadius:"50%",pointerEvents:"none"}}/>
               <Companion3D activeColor={activeCompanion.color} isThinking={isLoading} companionId={activeCompanion.id} onPoke={handlePoke} lastPoke={lastPoke}/>
             </div>
