@@ -1,2 +1,33 @@
-@import "tailwindcss";
+/* globals.css */
 
+/* ── CRITICAL: Mobile viewport fix ──────────────────────────────────────────
+   100vh on mobile includes the browser address bar, causing the input
+   to go off-screen. 100dvh (dynamic viewport height) fixes this.
+   Fallback to 100vh for older browsers.
+*/
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  height: -webkit-fill-available; /* iOS Safari fix */
+}
+
+body {
+  overflow: hidden;
+  /* Stack of fallbacks for mobile height */
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Remove Next.js dev indicator "__N" in bottom left during dev */
+nextjs-portal {
+  display: none;
+}
