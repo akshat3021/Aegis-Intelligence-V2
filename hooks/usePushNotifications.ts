@@ -96,11 +96,6 @@ export function usePushNotifications(companionId: string, userName: string) {
         icon: "/aegis-logo.svg",
         badge: "/aegis-logo.svg",
         tag: "aegis-notification",
-        vibrate: [200, 100, 200],
-        actions: [
-          { action: "open", title: "Open Aegis" },
-          { action: "dismiss", title: "Dismiss" },
-        ],
       });
     });
   }, [isRegistered, companionId]);
