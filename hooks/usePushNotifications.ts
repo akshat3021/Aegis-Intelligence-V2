@@ -99,6 +99,7 @@ export function usePushNotifications(companionId: string, userName: string) {
       });
     });
   }, [isRegistered, companionId]);
+  
 
   // Schedule a daily reminder using setTimeout (persists as long as tab is open)
   // For true background notifications, a Push server is needed

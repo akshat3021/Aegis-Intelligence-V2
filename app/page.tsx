@@ -16,7 +16,7 @@ const COMPANIONS = [
   {
     id:"squish",name:"Squish",bgColor:"#FBBF24",
     accent:"#F59E0B",accentRgb:"245,158,11",
-    voiceId:"DXFkLCBUTmvXpp2QwZjA",
+    voiceId:"21m00Tcm4TlvDq8ikWAM",
     label:"FRIENDLY_UNIT",status:"HELPFUL MODE",theme:"squish",
     wakeWords:["hey squish","squish","wake up"],
     greeting:(n:string)=>`Hey ${n}! 💛 Squish is here and ready to help. What are we working on today?`,
@@ -30,7 +30,7 @@ const COMPANIONS = [
   {
     id:"eva",name:"Eva",bgColor:"#64748B",
     accent:"#64748B",accentRgb:"100,116,139",
-    voiceId:"WeA4Q36twV5kwSaTEL0Q",
+    voiceId:"pNInz6obpgDQGcFmaJgB",
     label:"TECH_CORE",status:"ANALYTICAL MODE",theme:"eva",
     wakeWords:["hey eva","eva","wake up","aegis online"],
     greeting:(n:string)=>`AEGIS_ONLINE. Agent ${n} detected. All systems nominal. Awaiting your command.`,
@@ -44,7 +44,7 @@ const COMPANIONS = [
   {
     id:"spark",name:"Spark",bgColor:"#EC4899",
     accent:"#EC4899",accentRgb:"236,72,153",
-    voiceId:"rnaFpqVpBnt4nZq1fII4",
+    voiceId:"MF3mGyEYCl7XYWbV9V6O",
     label:"MOTIVATOR",status:"HYPERDRIVE MODE",theme:"spark",
     wakeWords:["hey spark","spark","wake up","let's go"],
     greeting:(n:string)=>`OMG ${n}!! 🎉✨ SPARK IS HERE AND WE ARE GOING TO HAVE THE BEST DAY EVER!! What's the plan?! 🚀💖`,
