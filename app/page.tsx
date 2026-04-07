@@ -645,33 +645,27 @@ export default function Home() {
         .chat-wrap{padding:0 12px;}
 
         /* Desktop overrides */
-        @media(min-width:768px){
-          .main-area{flex-direction:row;align-items:stretch;}
-
-          /* Chat: fixed 420px on the left */
-          .chat-col{
-            width:420px;flex-shrink:0;
-            display:flex;flex-direction:column;
-            border-right:1px solid rgba(128,128,128,.08);
-          }
-
-          /* Companion: takes ALL remaining space */
-          .companion-col{
-            flex:1;
-            display:flex;align-items:center;justify-content:center;
-            padding:24px;min-height:0;
-          }
-
-          /* Companion 3D: large on desktop */
-          .companion-inner{
-            width:min(520px,62vh);
-            height:min(520px,62vh);
-          }
-
-          .briefing-wrap{padding:0 20px 10px;}
-          .chat-wrap{padding:0 20px;}
-        }
-
+@media(min-width:768px){
+  .main-area{
+    flex-direction: row !important;
+    align-items: stretch !important;
+  }
+  .chat-col{
+    width: 400px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+  }
+  .companion-col{
+    flex: 1 !important;
+    padding: 32px !important;
+  }
+  .companion-inner{
+    width: min(540px, 65vh) !important;
+    height: min(540px, 65vh) !important;
+  }
+  .ham-btn{ display: none !important; }
+  .mob-profile-btn{ display: none !important; }
+}
         /* Bottom bar */
         .bottom-bar{flex-shrink:0;width:100%;padding:6px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;}
         @media(min-width:768px){.bottom-bar{padding:8px 24px;padding-bottom:max(16px,env(safe-area-inset-bottom));}}
