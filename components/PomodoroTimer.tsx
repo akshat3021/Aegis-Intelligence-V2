@@ -51,6 +51,11 @@ export default function PomodoroTimer({ accent, accentRgb, theme, companionName,
   const mins = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const secs = String(timeLeft % 60).padStart(2, "0");
 
+  // Bug #7 fix: track phaseIdx in a ref so the setTimeout callback inside the
+  // interval always reads the CURRENT value, not the stale closure value.
+  const phaseIdxRef = useRef(phaseIdx);
+  useEffect(() => { phaseIdxRef.current = phaseIdx; }, [phaseIdx]);
+
   useEffect(() => {
     if (!running) return;
     intervalRef.current = setInterval(() => {
@@ -71,10 +76,12 @@ export default function PomodoroTimer({ accent, accentRgb, theme, companionName,
           setRunning(false);
           const msgs = MOTIVATIONS[companionName] || MOTIVATIONS.squish;
           onMessage(msgs[3]);
-          if (phaseIdx === 0) setSessions(s => s + 1);
+          if (phaseIdxRef.current === 0) setSessions(s => s + 1);
           setTimeout(() => {
-            setPhaseIdx(p => (p + 1) % PHASES.length);
-            setTimeLeft(PHASES[(phaseIdx + 1) % PHASES.length].duration);
+            // Bug #7 fix: use ref to get current phaseIdx instead of stale closure value
+            const nextIdx = (phaseIdxRef.current + 1) % PHASES.length;
+            setPhaseIdx(nextIdx);
+            setTimeLeft(PHASES[nextIdx].duration);
           }, 1500);
           return 0;
         }

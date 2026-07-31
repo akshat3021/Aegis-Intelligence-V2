@@ -181,7 +181,7 @@ export default function MobileDrawer({
                 {menuItem("💬", isEva?"SYNC_LOGS":isSpark?"History!! 💬":"Chat History", ()=>{onHistory();onClose();})}
                 {menuItem("🍅", isEva?"POMODORO_TIMER":isSpark?"Pomodoro!! 🍅":"Pomodoro Timer", ()=>{onPomodoro();onClose();})}
                 {menuItem("📊", isEva?"PROGRESS_CARD":isSpark?"Share Card!! 📊":"Share Progress", ()=>{onShareCard();onClose();})}
-                {menuItem(soundOn?"🔇":"🎵", isEva?"SOUND_THEME":isSpark?`${soundOn?"Mute":"Sound"} 🎵`:`${soundOn?"Mute":"Sound Theme"}`, onToggleSound)}
+                {menuItem(soundOn?"🔇":"🎵", isEva?"SOUND_THEME":isSpark?`${soundOn?"Mute":"Sound"} 🎵`:`${soundOn?"Mute":"Sound Theme"}`, ()=>{onToggleSound();onClose();})}
                 {menuItem("ℹ️", isEva?"ABOUT_AEGIS":isSpark?"About!! ℹ️":"About Aegis", ()=>setSection("about"))}
                 {menuItem("🗑️", isEva?"WIPE_HISTORY":isSpark?"Wipe Chats!! 🗑️":"Wipe Chat", ()=>{onWipe();onClose();}, false)}
                 {menuItem("⏻", isEva?"TERMINATE_SESSION":isSpark?"Sign Out!! 👋":"Sign Out", ()=>{onSignOut();}, true)}

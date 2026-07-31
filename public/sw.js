@@ -58,11 +58,15 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // ── SCHEDULED LOCAL REMINDERS (via postMessage) ───────────────────────────────
-// The app sends a message to schedule daily check-in reminders
+// The app sends a message to schedule daily check-in reminders.
+// Bug #21 fix: declared as a proper variable instead of `self.reminderConfig`
+// which was an undeclared dynamic property on the SW global scope.
+let reminderConfig = null;
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SCHEDULE_REMINDER') {
     const { companionName, userName, reminderHour } = event.data;
-    // Store reminder config
-    self.reminderConfig = { companionName, userName, reminderHour };
+    // Store reminder config for use when push events arrive
+    reminderConfig = { companionName, userName, reminderHour };
   }
 });

@@ -65,8 +65,10 @@ export default function AppDownloadBanner() {
     }
   };
 
-  // Don't render if inside Capacitor app, or dismissed, or not ready
-  if (isCapacitor || dismissed || !show) return null;
+  // Bug #22 fix: don't render when APK URL is still the placeholder — shows a
+  // confusing alert() to users and looks unprofessional.
+  const hasRealApkUrl = APK_DOWNLOAD_URL && APK_DOWNLOAD_URL !== "YOUR_APK_DOWNLOAD_LINK_HERE";
+  if (isCapacitor || dismissed || !show || !hasRealApkUrl) return null;
 
   return (
     <>

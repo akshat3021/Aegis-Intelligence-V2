@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
+// Bug #17 fix: import shared XP formula so ShareCard and page.tsx always agree
+import { getXPForLvl } from "../lib/gameUtils";
 
 interface Props {
   name: string;
@@ -139,10 +141,10 @@ export default function ShareCard({ name, level, xp, streak, companionName, acce
       ctx.fillText(s.value, x, y+70);
     });
 
-    // ── XP PROGRESS BAR ──────────────────────────────────────────────────────
-    const xpForNext = Math.ceil(Math.pow(level, 1.667) * 80);
-    const xpCurrent = Math.ceil(Math.pow(level-1, 1.667) * 80);
-    const pct = Math.min(100, ((xp - xpCurrent) / (xpForNext - xpCurrent)) * 100);
+    // Bug #17 fix: use shared formula from gameUtils (matches page.tsx exactly)
+    const xpForNext  = getXPForLvl(level + 1);
+    const xpCurrent  = getXPForLvl(level);
+    const pct = xpForNext <= xpCurrent ? 0 : Math.min(100, ((xp - xpCurrent) / (xpForNext - xpCurrent)) * 100);
 
     ctx.fillStyle = `rgba(${accentRgb},0.15)`;
     roundRect(ctx, 160, 860, 760, 20, 10); ctx.fill();
@@ -163,7 +165,10 @@ export default function ShareCard({ name, level, xp, streak, companionName, acce
     ctx.textAlign = "center";
     ctx.fillText("aegis-intelligence-v2.vercel.app", 540, 990);
 
-  }, []);
+  // Bug #8 fix: added all props as deps so canvas redraws whenever theme/level/
+  // xp/streak changes. Previously used [] which meant the canvas never updated
+  // if the component was closed and reopened with a different companion.
+  }, [name, level, xp, streak, companionName, accent, accentRgb, theme]);
 
   function roundRect(ctx: CanvasRenderingContext2D, x:number,y:number,w:number,h:number,r:number) {
     ctx.beginPath();

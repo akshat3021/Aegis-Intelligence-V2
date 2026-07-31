@@ -12,13 +12,9 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false },
   icons: {
-    icon: [
-      { url: "/aegis-logo.svg", type: "image/svg+xml" },
-      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
-    ],
-    apple: [
-      { url: "/icons/icon-192x192.png" },
-    ],
+    // Bug #2 fix: only reference files that actually exist
+    icon: [{ url: "/aegis-logo.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/aegis-logo.svg" }],
   },
 };
 
@@ -38,10 +34,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        {/* SVG favicon — shows the Aegis hex logo in browser tab */}
+        {/* Bug #23 fix: Google Fonts loaded here (in <head>) instead of via
+            CSS @import inside JSX <style> tags, which is render-blocking.
+            Preconnect reduces DNS lookup time for the font domains. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Bubblegum+Sans&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap"
+        />
+
+        {/* Bug #2 fix: only reference the SVG icon that actually exists */}
         <link rel="icon" href="/aegis-logo.svg" type="image/svg+xml" />
         <link rel="alternate icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" href="/aegis-logo.svg" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#050508" />
         <meta name="mobile-web-app-capable" content="yes" />

@@ -9,6 +9,8 @@ import AppDownloadBanner from "../components/AppDownloadBanner";
 import PomodoroTimer from "../components/PomodoroTimer";
 import ShareCard from "../components/ShareCard";
 import MobileDrawer from "../components/MobileDrawer";
+// Bug #17 fix: import shared XP formula (eliminates inconsistency with ShareCard)
+import { getLvl, getXPForLvl } from "../lib/gameUtils";
 
 // ─── FREE-TIER ELEVENLABS VOICE IDs ──────────────────────────────────────────
 // These are the only voices that work on free ElevenLabs accounts.
@@ -90,8 +92,10 @@ function playUI(type: "click" | "send" | "poke" | "levelup" | "switch" | "briefi
   } catch (_) {}
 }
 
-const getLvl = (xp: number) => Math.floor(Math.pow(xp / 80, .6)) + 1;
-const getXPForLvl = (l: number) => Math.ceil(Math.pow(l - 1, 1.667) * 80);
+// Bug #17 fix: getLvl/getXPForLvl now imported from lib/gameUtils (single source of truth)
+// Keeping local aliases so the rest of the file doesn't need changes.
+const _getLvl = getLvl;
+const _getXPForLvl = getXPForLvl;
 
 // ─── THEME TOKENS ─────────────────────────────────────────────────────────────
 const T = {
@@ -220,10 +224,12 @@ export default function Home() {
 
   const { accent, accentRgb, theme } = activeCompanion;
   const ts      = T[theme as keyof typeof T];
-  const level   = getLvl(xp);
-  const nxtXP   = getXPForLvl(level + 1);
-  const curXP   = getXPForLvl(level);
-  const xpPct   = Math.min(100, ((xp - curXP) / (nxtXP - curXP)) * 100);
+  // Bug #17 fix: use shared getLvl/getXPForLvl from gameUtils
+  const level   = _getLvl(xp);
+  const nxtXP   = _getXPForLvl(level + 1);
+  const curXP   = _getXPForLvl(level);
+  // Bug #18 fix: guard division-by-zero when nxtXP === curXP (level 1, 0 XP)
+  const xpPct   = nxtXP <= curXP ? 0 : Math.min(100, ((xp - curXP) / (nxtXP - curXP)) * 100);
   const isEva   = theme === "eva", isSpark = theme === "spark";
   const doneTasks = tasks.filter(t => t.completed).length;
 
@@ -249,7 +255,8 @@ export default function Home() {
     const ld = localStorage.getItem("aegis_last_date");
     const today = new Date().toDateString();
     const yesterday = new Date(Date.now() - 86400000).toDateString();
-    setXP(sx); prevLevelRef.current = getLvl(sx);
+    // Bug #17 fix: use shared getLvl
+    setXP(sx); prevLevelRef.current = _getLvl(sx);
     if (ld !== today) {
       const ns = ld === yesterday ? ss + 1 : ld ? 1 : ss;
       setStreak(ns); localStorage.setItem("aegis_streak", String(ns)); localStorage.setItem("aegis_last_date", today);
@@ -259,7 +266,8 @@ export default function Home() {
   useEffect(() => {
     if (xp === 0) return;
     localStorage.setItem("aegis_xp", String(xp));
-    const nl = getLvl(xp);
+    // Bug #17 fix: use shared _getLvl
+    const nl = _getLvl(xp);
     if (nl > prevLevelRef.current) {
       setLevelUpNum(nl); setShowLevelUp(true); playUI("levelup", theme);
       prevLevelRef.current = nl; setTimeout(() => setShowLevelUp(false), 3500);
@@ -282,12 +290,18 @@ export default function Home() {
     (async () => {
       const { data: pData } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
       if (pData) { setProfile(pData); setNameInput(pData.full_name || ""); }
-      const { data: tData } = await supabase.from("tasks").select("*").order("created_at", { ascending: true });
+      // Bug #20 fix: added user_id filter — without it, ALL users' tasks are fetched
+      // (relies entirely on RLS which may not be configured correctly)
+      const { data: tData } = await supabase.from("tasks").select("*").eq("user_id", session.user.id).order("created_at", { ascending: true });
       if (tData) setTasks(tData);
 
+      // Bug #12 fix: removed the redundant setActiveCompanion call here.
+      // The mount useEffect (line ~235) already reads localStorage and sets the
+      // companion — doing it again here caused a race condition / double-init.
       const savedCompId = localStorage.getItem("aegis_companion");
       const companion = COMPANIONS.find(c => c.id === savedCompId) || COMPANIONS[0];
-      setActiveCompanion(companion);
+      // Only update if it's actually different to avoid triggering other effects
+      setActiveCompanion(prev => prev.id === companion.id ? prev : companion);
 
       const name    = pData?.full_name || "Agent";
       const hour    = new Date().getHours();
@@ -385,8 +399,14 @@ export default function Home() {
     soundNodesRef.current = []; soundRef.current?.close(); soundRef.current = null;
   }, []);
 
-  const toggleSound = () => { if (soundOn) { stopSound(); setSoundOn(false); } else { startSound(); setSoundOn(true); } };
-  useEffect(() => { if (soundOn) { stopSound(); setSoundOn(false); } }, [activeCompanion.id]);
+  const toggleSound = useCallback(() => {
+    // Bug #4 fix: wrapped in useCallback so stable reference is passed to MobileDrawer
+    if (soundOn) { stopSound(); setSoundOn(false); } else { startSound(); setSoundOn(true); }
+  }, [soundOn, startSound, stopSound]);
+
+  // Bug #3 fix: added stopSound and soundOn to dependency array to avoid stale closure.
+  // The effect must see the current soundOn value to correctly stop audio on companion switch.
+  useEffect(() => { if (soundOn) { stopSound(); setSoundOn(false); } }, [activeCompanion.id, soundOn, stopSound]);
 
   // ── NOTIFICATIONS ──────────────────────────────────────────────────────────
   const requestPermission = async () => {
@@ -447,7 +467,18 @@ export default function Home() {
     setTimeout(() => setCompanionAnim(""), 700);
     setPokeCount(p => {
       const n = p + 1;
-      if (n >= 5) { handleSendMessage(isEva ? "Touch sensors malfunctioning. Cease contact." : isSpark ? "STOPPP ITTTTT 😤" : "Hey! Stop poking me! 😅", false); return 0; }
+      if (n >= 5) {
+        // Bug #14 fix: poke reply is now a local direct message, NOT sent through
+        // the Groq API. Previously this burned tokens + ElevenLabs quota every 5 pokes.
+        const pokeReply = isEva
+          ? "Touch sensors malfunctioning. Cease contact."
+          : isSpark
+          ? "STOPPP ITTTTT 😤 (ok that was kinda funny tho)"
+          : "Hey! That tickles! Stop poking me! 😅";
+        setMessages(prev => [...prev, { role: "assistant", content: pokeReply, timestamp: Date.now() }]);
+        setExpandChat(false);
+        return 0;
+      }
       return n;
     });
   };
@@ -466,8 +497,19 @@ export default function Home() {
       const t = e.results[0][0].transcript.toLowerCase().trim();
       const matched = COMPANIONS.find(c => c.wakeWords.some(w => t.includes(w)));
       if (matched) {
-        if (matched.id !== activeCompanion.id) { switchCompanion(matched); setTimeout(() => handleSendMessage(matched.greeting(profile.full_name || "Agent"), false), 500); }
-        else handleSendMessage(`${activeCompanion.name} activated!`, false);
+        if (matched.id !== activeCompanion.id) {
+          switchCompanion(matched);
+          // Bug #15 fix: greeting added as a local message — previously it went
+          // through the full Groq pipeline (wasting tokens) for a canned string.
+          setTimeout(() => {
+            const greetingText = matched.greeting(profile.full_name || "Agent");
+            setMessages(prev => [...prev, { role: "assistant", content: greetingText, timestamp: Date.now() }]);
+            setExpandChat(false);
+          }, 500);
+        } else {
+          setMessages(prev => [...prev, { role: "assistant", content: `${activeCompanion.name} activated!`, timestamp: Date.now() }]);
+          setExpandChat(false);
+        }
       } else { handleSendMessage(e.results[0][0].transcript); }
     };
     rec.start();
@@ -480,6 +522,12 @@ export default function Home() {
     playUI("send", theme); setIsLoading(true);
     if (!override) setInputText("");
     const mood = detectMood(text);
+
+    // Bug #5 fix: add the user message to state IMMEDIATELY (optimistic update)
+    // so the UI doesn't appear frozen while waiting for the AI response.
+    setMessages(p => [...p, { role: "user", content: text, timestamp: Date.now() }]);
+    // Bug #6 fix: reset expanded state when user sends a new message
+    setExpandChat(false);
 
     // Save mood history
     if (mood !== "neutral") {
@@ -511,17 +559,16 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(`API ${res.status}`);
       const data = await res.json();
-      // Update local state (DB is saved by the API route)
+      // Bug #5 fix: user message already added above; only append AI reply here.
+      // DB persistence is handled by the API route.
       setMessages(p => [...p,
-        { role: "user",      content: text,       timestamp: Date.now() },
-        { role: "assistant", content: data.reply,  timestamp: Date.now() + 1 },
+        { role: "assistant", content: data.reply, timestamp: Date.now() + 1 },
       ]);
       addXP(10); setCompanionAnim("wave"); setTimeout(() => setCompanionAnim(""), 700);
       if (!isSilent) speakText(data.reply, activeCompanion);
     } catch (e) {
       console.error(e);
       setMessages(p => [...p,
-        { role: "user",      content: text },
         { role: "assistant", content: "Sorry, couldn't connect. Check your internet." },
       ]);
     } finally { setIsLoading(false); }
@@ -599,7 +646,9 @@ export default function Home() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Bubblegum+Sans&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+        /* Bug #23 fix: @import for Google Fonts removed from here.
+           Fonts are now loaded via <link> tags in app/layout.tsx,
+           which is non-render-blocking and loaded once for the whole app. */
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes pd{0%,100%{opacity:1}50%{opacity:.3}}
         @keyframes ap{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
@@ -733,7 +782,22 @@ export default function Home() {
           tasks={tasks} messages={messages} pokeCount={pokeCount} xpPct={xpPct}
           notifStatus={notifStatus} onRequestNotif={requestPermission}
           onGoals={() => setIsTaskOpen(true)} onHistory={() => setIsHistoryOpen(true)}
-          onWipe={() => { if (confirm("Clear chat?")) setMessages([{ role: "assistant", content: activeCompanion.greeting(profile.full_name || "Agent"), timestamp: Date.now() }]); }}
+          onWipe={async () => {
+            if (!confirm("Clear chat?")) return;
+            // Bug #16 fix: wipe now also deletes messages from Supabase.
+            // Previously only local state was cleared, so wiped messages came
+            // back on the next login from another device.
+            if (session?.user?.id) {
+              try {
+                await supabase
+                  .from("messages")
+                  .delete()
+                  .eq("user_id", session.user.id)
+                  .eq("companion_id", activeCompanion.id);
+              } catch (e) { console.warn("Could not wipe Supabase messages:", e); }
+            }
+            setMessages([{ role: "assistant", content: activeCompanion.greeting(profile.full_name || "Agent"), timestamp: Date.now() }]);
+          }}
           onSignOut={() => supabase.auth.signOut()}
           onAvatarClick={() => fileInputRef.current?.click()}
           onEditName={() => setEditingName(true)}
@@ -907,7 +971,18 @@ export default function Home() {
               <div className="desk-nav">
                 <button onClick={() => { playUI("click", theme); setIsTaskOpen(true); }} style={{ ...ts.panelBtn, padding: "7px 12px", cursor: "pointer" }}>{isEva ? "GOALS" : "🎯 Goals"}</button>
                 <button onClick={() => { playUI("click", theme); setIsHistoryOpen(true); }} style={{ ...ts.panelBtn, padding: "7px 12px", cursor: "pointer" }}>{isEva ? "HISTORY" : "💬 History"}</button>
-                <button onClick={() => { if (confirm("Clear chat?")) setMessages([{ role: "assistant", content: activeCompanion.greeting(profile.full_name || "Agent"), timestamp: Date.now() }]); }} style={{ ...ts.panelBtnR, padding: "7px 12px", cursor: "pointer" }}>{isEva ? "WIPE" : "Wipe"}</button>
+                <button onClick={() => { if (!confirm("Clear chat?")) return;
+                  // Bug #16 fix: also wipe Supabase messages on desktop
+                  // Use void + async IIFE so TypeScript is happy with the PromiseLike return
+                  if (session?.user?.id) {
+                    void (async () => {
+                      try {
+                        await supabase.from("messages").delete().eq("user_id", session.user.id).eq("companion_id", activeCompanion.id);
+                      } catch { /* silent — local wipe still proceeds */ }
+                    })();
+                  }
+                  setMessages([{ role: "assistant", content: activeCompanion.greeting(profile.full_name || "Agent"), timestamp: Date.now() }]);
+                }} style={{ ...ts.panelBtnR, padding: "7px 12px", cursor: "pointer" }}>{isEva ? "WIPE" : "Wipe"}</button>
               </div>
               {/* Companion selector */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", flexShrink: 0 }}>

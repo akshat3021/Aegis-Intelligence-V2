@@ -427,7 +427,7 @@ export default function Auth() {
                 {resendCooldown>0 ? `RESEND IN ${resendCooldown}s` : "RESEND CODE"}
               </button>
 
-              <button className="auth-switch" onClick={()=>{setScreen("auth");setError("");setSuccessMsg("");setOtp(["","","","","",""]);otp.fill("");}}>
+              <button className="auth-switch" onClick={()=>{setScreen("auth");setError("");setSuccessMsg("");setOtp(["","","","","",""]);}}>
                 ← <span>Back</span> to sign up
               </button>
             </div>

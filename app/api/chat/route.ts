@@ -37,9 +37,11 @@ export async function POST(req: NextRequest) {
       buildMoodContext(moodHistory) +
       (currentMood && currentMood !== "neutral" ? `\n\nCURRENT MOOD: User seems ${currentMood} right now.` : "");
 
-    // Load DB history for context
+    // Load DB history ONLY as a fallback when the frontend sends no session context.
+    // Bug #11 fix: if chatHistory.length > 0, frontend already has the right context;
+    // merging with DB would send duplicate messages and confuse the AI.
     let dbHistory: { role: string; content: string }[] = [];
-    if (userId && supabaseAdmin) {
+    if (userId && supabaseAdmin && chatHistory.length === 0) {
       try {
         const { data } = await supabaseAdmin.from("messages").select("role, content").eq("user_id", userId).eq("companion_id", companionId).order("created_at", { ascending: true }).limit(20);
         if (data?.length) dbHistory = data.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));

@@ -78,7 +78,10 @@ function ModelSelector({ companionId, isThinking, lastPoke }: { companionId: str
         return () => clearTimeout(timeout);
       }
     }
-  }, [lastPoke]);
+  // Bug #19 fix: isThinking was used inside this effect (in the base animation
+  // fallback after poke) but missing from deps — caused stale closure where
+  // wrong animation played if isThinking state changed since last render.
+  }, [lastPoke, isThinking, companionId, evaAnims.actions, sparkAnims.actions, slimeAnims.actions]);
 
   return <primitive object={scene} scale={active.scale} position={active.pos} rotation={active.rot} />;
 }
@@ -99,7 +102,9 @@ function Rig() {
 
 export default function Companion3D(props: any) {
   return (
-    <div className="w-full h-full cursor-pointer pointer-events-auto" onClick={props.onPoke}>
+    // Bug #1 fix: replaced Tailwind classes (w-full, h-full) with inline styles.
+    // This project uses inline styles, not Tailwind, so class names were no-ops.
+    <div style={{ width: "100%", height: "100%", cursor: "pointer", pointerEvents: "auto" }} onClick={props.onPoke}>
       <Canvas camera={{ position: [0, 0, 5], fov: 35 }}>
         <ambientLight intensity={0.8} />
         <pointLight position={[10, 10, 10]} intensity={1.5} color={props.activeColor} />
