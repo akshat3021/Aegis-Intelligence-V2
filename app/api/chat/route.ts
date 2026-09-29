@@ -1,26 +1,28 @@
 // app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { buildSystemPrompt } from "@/lib/ai/context";
+import { getCompanionConfig } from "@/lib/ai/companions";
 
 const GROQ_MODEL = "openai/gpt-oss-20b"; // change here if Groq retires it again
 
-const SYSTEM_PROMPTS: Record<string, string> = {
-  squish: `You are Squish, a warm and friendly AI companion. You are cheerful, supportive, and always encouraging. You speak in a casual, friendly tone with occasional emojis. You remember the user's goals and past conversations, and reference them naturally. If the user was stressed recently, acknowledge it gently. Keep responses concise (2-4 sentences max) unless asked for more.`,
-  eva: `You are Eva, a precise and technical AI companion. You speak in a calm, analytical tone. You are efficient and data-driven, but not cold. You remember the user's objectives and past interactions, referencing them when relevant. Keep responses concise and accurate. 2-4 sentences unless asked for more.`,
-  spark: `You are Spark, an extremely enthusiastic and high-energy AI companion!! You speak with LOTS of excitement, emojis, and caps for emphasis!! You are the ultimate hype person. Keep responses 2-4 sentences but PACKED with energy!!`,
-};
-
-function buildMoodContext(moodHistory: { mood: string; date: string }[]): string {
-  if (!moodHistory?.length) return "";
-  const recent = moodHistory.slice(-7);
-  const parts: string[] = [];
-  if (recent.filter((m) => m.mood === "stressed").length >= 2)
-    parts.push("User has been stressed recently — be extra supportive");
-  if (recent.filter((m) => m.mood === "happy").length >= 3)
-    parts.push("User has been in great mood — match their energy");
-  if (recent.filter((m) => m.mood === "focused").length >= 2)
-    parts.push("User has been in focused work mode — be efficient");
-  return parts.length ? `\n\nMOOD CONTEXT: ${parts.join(". ")}.` : "";
+/**
+ * Fallback prompt used only when we can't reach Supabase (missing env vars)
+ * or don't have a userId yet — e.g. a guest/anonymous session.
+ * No memory, mood trend, or tasks — just the companion's personality.
+ */
+function buildFallbackPrompt(companionId: string): { systemPrompt: string; temperature: number } {
+  const companion = getCompanionConfig(companionId);
+  const systemPrompt = [
+    companion.systemPrompt,
+    "",
+    "Speech patterns:",
+    ...companion.speechPatterns.map((p) => `- ${p}`),
+    "",
+    "Hard limits:",
+    ...companion.toneLimits.map((l) => `- ${l}`),
+  ].join("\n");
+  return { systemPrompt, temperature: companion.temperature };
 }
 
 export async function POST(req: NextRequest) {
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
       companionId = "squish",
       chatHistory = [],
       userProfile,
-      currentMood,
+      currentMood = "neutral",
       moodHistory = [],
       userId,
     } = await req.json();
@@ -45,22 +47,42 @@ export async function POST(req: NextRequest) {
     }
 
     // Lazy Supabase init — must be inside the function to avoid a build-time crash
-    let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+    let supabaseAdmin: SupabaseClient | null = null;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (supabaseUrl && serviceKey) {
       supabaseAdmin = createClient(supabaseUrl, serviceKey);
     }
 
-    const systemPrompt =
-      (SYSTEM_PROMPTS[companionId] || SYSTEM_PROMPTS.squish) +
-      (userProfile?.full_name
-        ? `\n\nUSER: Name: ${userProfile.full_name}. Objective: ${userProfile.objective || "Not set"}.`
-        : "") +
-      buildMoodContext(moodHistory) +
-      (currentMood && currentMood !== "neutral"
-        ? `\n\nCURRENT MOOD: User seems ${currentMood} right now.`
-        : "");
+    // ── Build the system prompt ────────────────────────────────────────────
+    // Full context system (personality + mood + memory + tasks) needs both
+    // a userId and a working Supabase connection. Fall back to a
+    // personality-only prompt for guest sessions or if Supabase env vars
+    // are missing, rather than failing the whole request.
+    let systemPrompt: string;
+    let temperature: number;
+
+    if (supabaseAdmin && userId) {
+      const result = await buildSystemPrompt({
+        companionId,
+        userId,
+        currentMessage: message,
+        currentMood,
+        moodHistory,
+        userProfile: userProfile || {},
+        supabaseAdmin,
+      });
+      systemPrompt = result.systemPrompt;
+      temperature = result.temperature;
+
+      if (process.env.AEGIS_DEBUG === "true") {
+        console.log(`[AEGIS CONTEXT] token estimate: ${result.tokenEstimate}`);
+      }
+    } else {
+      const fallback = buildFallbackPrompt(companionId);
+      systemPrompt = fallback.systemPrompt;
+      temperature = fallback.temperature;
+    }
 
     // Load DB history only as a fallback when the frontend sends no session context.
     let dbHistory: { role: string; content: string }[] = [];
@@ -103,7 +125,7 @@ export async function POST(req: NextRequest) {
         // so keep this generous to avoid empty replies.
         max_tokens: 1024,
         reasoning_effort: "low",
-        temperature: companionId === "eva" ? 0.4 : companionId === "spark" ? 0.9 : 0.7,
+        temperature,
       }),
     });
 
