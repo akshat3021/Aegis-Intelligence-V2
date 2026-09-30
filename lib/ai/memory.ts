@@ -74,7 +74,7 @@ export async function touchMemories(
  * Sanitize a memory content string for safe inclusion in a prompt.
  * Strips control characters, trims, and enforces length limit.
  */
-export function sanitizeMemoryContent(content: string): string { {
+export function sanitizeMemoryContent(content: string): string {
   return content
     .replace(/[\x00-\x1F\x7F]/g, "") // strip control chars
     .trim()
