@@ -120,9 +120,9 @@ export async function extractAndSaveMemories({
         category: mem.category,
         relevance_score: clamp(Number(mem.relevance_score) || 5, 1, 10),
         // 'source' distinguishes auto-extracted memories from ones a user
-        // manually added — remove this field if your user_memory table
-        // doesn't have a source column.
-        source: "auto_extracted",
+        // manually added. Must match the DB check constraint exactly:
+        // 'manual' | 'auto' | 'system'.
+        source: "auto",
         created_at: new Date().toISOString(),
         last_referenced_at: new Date().toISOString(),
       });
