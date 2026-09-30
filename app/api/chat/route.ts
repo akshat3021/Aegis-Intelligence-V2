@@ -1,8 +1,10 @@
 // app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { buildSystemPrompt } from "@/lib/ai/context";
 import { getCompanionConfig } from "@/lib/ai/companions";
+import { extractAndSaveMemories } from "@/lib/ai/memoryExtraction";
 
 const GROQ_MODEL = "openai/gpt-oss-20b"; // change here if Groq retires it again
 
@@ -55,10 +57,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Build the system prompt ────────────────────────────────────────────
-    // Full context system (personality + mood + memory + tasks) needs both
-    // a userId and a working Supabase connection. Fall back to a
-    // personality-only prompt for guest sessions or if Supabase env vars
-    // are missing, rather than failing the whole request.
     let systemPrompt: string;
     let temperature: number;
 
@@ -121,8 +119,6 @@ export async function POST(req: NextRequest) {
           ...contextHistory.map((m: any) => ({ role: m.role, content: m.content })),
           { role: "user", content: message },
         ],
-        // gpt-oss models "think" first, and that counts toward max_tokens,
-        // so keep this generous to avoid empty replies.
         max_tokens: 1024,
         reasoning_effort: "low",
         temperature,
@@ -131,7 +127,7 @@ export async function POST(req: NextRequest) {
 
     if (!groqRes.ok) {
       const err = await groqRes.text();
-      console.error("Groq error:", groqRes.status, err); // shows in Vercel Logs
+      console.error("Groq error:", groqRes.status, err);
       return NextResponse.json({ error: "AI error" }, { status: 500 });
     }
 
@@ -164,6 +160,22 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.warn("Could not save messages:", e);
       }
+    }
+
+    // ── Auto memory extraction — runs AFTER the response is sent ──────────
+    // Uses Next.js's after() so this never adds latency to the chat reply.
+    // Only runs for real logged-in users with a working Supabase connection.
+    if (userId && supabaseAdmin) {
+      const supabaseForBackground = supabaseAdmin; // narrow the type for the closure below
+      after(async () => {
+        await extractAndSaveMemories({
+          userMessage: message,
+          assistantReply: reply,
+          userId,
+          companionId,
+          supabaseAdmin: supabaseForBackground,
+        });
+      });
     }
 
     return NextResponse.json({ reply });
